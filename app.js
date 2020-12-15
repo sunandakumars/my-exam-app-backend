@@ -14,16 +14,35 @@ const jwtsecret = "secret123";
 var https = require('https');
 mongoose.connect("mongodb://localhost:27017/userDetails",{useNewUrlParser : true,useUnifiedTopology: true})
 console.log(mongoose.connection.readyState);
-
+// Scehma creation begins
 const userSchema = new mongoose.Schema({
   Fname : String,
   Lname : String,
   Email : String,
   Password : String
 });
+const examSchema = new mongoose.Schema({
+  Course_ID : String,
+  Course_Name : String,
+  Exam_ID : String,
+  Exam_Name : String,
+  date:Date,
+  Duration:String,
+  QuestionBank:Array
+});
 
+const coursemonthSchema = new mongoose.Schema({
+  Course_ID : String,
+  Course_Name : String,
+  Month_ID : String,
+  Month_Name : String,
+  Year:String
+
+});
 const User = mongoose.model("User",userSchema);
-
+const Exam = mongoose.model("Exam",examSchema);
+const Coursemonth = mongoose.model("Coursemonth",coursemonthSchema);
+// Schema creation ends
 
 app.get("/",function(req,res){
   res.send("DB Test");
@@ -134,6 +153,86 @@ app.post("/authenticate",function(req,res){
 })
 
 // Authenticate route ends
+
+// uploadQuestionBank route begins
+app.post("/uploadQuestionBank",uploadQuestionBank)
+
+function uploadQuestionBank(req,res){
+    Exam.findOne({Exam_ID:req.body.Exam_ID},function(err,examDetails){
+      console.log(req.body.Exam_ID,err,examDetails);
+        if(err){console.log(err)}
+        else if(!examDetails){
+            const exam = new Exam({
+              Course_ID : req.body.Course_ID,
+              Course_Name : req.body.Course_Name,
+              Exam_ID : req.body.Exam_ID,
+              Exam_Name : req.body.Exam_Name,
+              date: req.body.date,
+              QuestionBank:req.body.QuestionBank
+            });
+            exam.save(function(err,examDetails){
+            if (err){console.log(err);}
+            else{res.json({message : "Exam Added Sucessfully"})}
+            })
+        }
+        else if(examDetails){
+          res.json({message : "Exam Already Exists"})
+        }
+
+    })
+}
+
+
+
+//uploadQuestionBank route ends
+
+
+// Retrieve ExamMonths route begins
+app.post("/RetrieveExamMonths",RetrieveExamMonths)
+
+function RetrieveExamMonths(req,res){
+  console.log(req,req.body);
+    Coursemonth.find({Course_ID:req.body.Course_ID},function(err,examMonthsDetails){
+      console.log(req.body.Course_ID,req.body.Exam_ID,err,examMonthsDetails);
+        if(err){console.log(err)}
+        else if(!examMonthsDetails){
+            res.json({message : "No ExamMonths Exists"})
+          }
+        else if(examMonthsDetails){
+          res.json({message : "ExamMonths Details Found",examMonthsDetails});
+        }
+
+    })
+}
+
+
+
+//Retrieve ExamMonths route ends
+
+// RetrieveQuestionBank route begins
+app.post("/RetrieveQuestionBank",RetrieveQuestionBank)
+
+function RetrieveQuestionBank(req,res){
+  console.log(req,req.body);
+    Exam.find({Course_ID:req.body.Course_ID},function(err,examDetails){
+      console.log(req.body.Course_ID,req.body.Exam_ID,err,examDetails);
+        if(err){console.log(err)}
+        else if(!examDetails){
+            res.json({message : "No Exam Exists"})
+          }
+        else if(examDetails){
+          res.json({message : "Exam Details Found",examDetails});
+        }
+
+    })
+}
+
+
+
+//RetrieveQuestionBank route ends
+
+
+
 
 // app.use(jwt({secret:jwtsecret,getToken: req => req.cookies.token,algorithms: ['HS256']}));
 
