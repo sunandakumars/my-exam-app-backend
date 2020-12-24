@@ -39,9 +39,18 @@ const coursemonthSchema = new mongoose.Schema({
   Year:String
 
 });
+
+const userexamresponseSchema = new mongoose.Schema({
+  userID : String,
+  Exam_Name : String,
+  userOptions:Array,
+  userResults:Object
+});
+
 const User = mongoose.model("User",userSchema);
 const Exam = mongoose.model("Exam",examSchema);
 const Coursemonth = mongoose.model("Coursemonth",coursemonthSchema);
+const Userexamresponse = mongoose.model("Userexamresponse",userexamresponseSchema);
 // Schema creation ends
 
 app.get("/",function(req,res){
@@ -131,7 +140,7 @@ function login(req,res){
 //CreateJWT Function begins
 
 function createJWT(req,res,user,message){
-  const token = jsonwebtoken.sign({user:user},jwtsecret,{ expiresIn: "60000" });
+  const token = jsonwebtoken.sign({user:user},jwtsecret,{ expiresIn: "600000" });
   res.cookie('token',token,{httpOnly:true});
   res.json({user:user,token:token,message:message});
   console.log(token,"request:");
@@ -144,9 +153,11 @@ function createJWT(req,res,user,message){
 app.post("/authenticate",function(req,res){
     if(req.cookies.token){
   // const decoded =jsonwebtoken.verify(req.cookies.token,jwtsecret);
+  // console.log("decoded",jsonwebtoken.verify(req.cookies.token,jwtsecret));
         jsonwebtoken.verify(req.cookies.token,jwtsecret,function(err,decoded){
+          console.log(decoded,"decoded");
           if(err){return res.json({message : "Not Valid token"})}
-          else return res.json({message : "Authenticated"})
+          else return res.json({message : "Authenticated",userID:decoded.user.Email})
         })
       }
     else return res.json({message : "Cookie CLeared"})
@@ -159,7 +170,7 @@ app.post("/uploadQuestionBank",uploadQuestionBank)
 
 function uploadQuestionBank(req,res){
     Exam.findOne({Exam_ID:req.body.Exam_ID},function(err,examDetails){
-      console.log(req.body.Exam_ID,err,examDetails);
+      // console.log(req.body.Exam_ID,err,examDetails);
         if(err){console.log(err)}
         else if(!examDetails){
             const exam = new Exam({
@@ -191,9 +202,9 @@ function uploadQuestionBank(req,res){
 app.post("/RetrieveExamMonths",RetrieveExamMonths)
 
 function RetrieveExamMonths(req,res){
-  console.log(req,req.body);
+  // console.log(req,req.body);
     Coursemonth.find({Course_ID:req.body.Course_ID},function(err,examMonthsDetails){
-      console.log(req.body.Course_ID,req.body.Exam_ID,err,examMonthsDetails);
+      // console.log(req.body.Course_ID,req.body.Exam_ID,err,examMonthsDetails);
         if(err){console.log(err)}
         else if(!examMonthsDetails){
             res.json({message : "No ExamMonths Exists"})
@@ -210,12 +221,12 @@ function RetrieveExamMonths(req,res){
 //Retrieve ExamMonths route ends
 
 // RetrieveQuestionBank route begins
-app.post("/RetrieveQuestionBank",RetrieveQuestionBank)
+app.post("/RetrieveExamDetails",RetrieveExamDetails)
 
-function RetrieveQuestionBank(req,res){
-  console.log(req,req.body);
+function RetrieveExamDetails(req,res){
+  // console.log(req,req.body);
     Exam.find({Course_ID:req.body.Course_ID},function(err,examDetails){
-      console.log(req.body.Course_ID,req.body.Exam_ID,err,examDetails);
+      // console.log(req.body.Course_ID,req.body.Exam_ID,err,examDetails);
         if(err){console.log(err)}
         else if(!examDetails){
             res.json({message : "No Exam Exists"})
@@ -231,7 +242,58 @@ function RetrieveQuestionBank(req,res){
 
 //RetrieveQuestionBank route ends
 
+// ExamSubmit route begins
+app.post("/ExamSubmit",ExamSubmit)
 
+function ExamSubmit(req,res){
+  console.log(req.body);
+
+const query = {userID: req.body.userID,Exam_Name:req.body.Exam_Name};
+const update={$set:{userOptions:req.body.userInputArray,userResults:req.body.userResults}};
+const options ={upsert: true};
+// Userexamresponse.updateOne(query, update, options);
+    Userexamresponse.updateOne(query, update, options,function(err,userexamresponses){
+      console.log(req.body,err,userexamresponses);
+        if(err){console.log(err)}
+        else(res.json({message : "Useroptions Sucessfully Saved"}))
+        // else if(!examDetails){
+        //     res.json({message : "No Exam Exists"})
+        //   }
+        // else if(examDetails){
+        //   res.json({message : "Exam Details Found",examDetails});
+        // }
+
+    })
+}
+
+
+
+//ExamSubmit route ends
+
+// ExamSubmit route begins
+app.post("/userExamExamResponses",userExamExamResponses)
+
+function userExamExamResponses(req,res){
+  console.log(req.body);
+
+const query = {userID: req.body.userID,Exam_Name:req.body.Exam_Name};
+// Userexamresponse.updateOne(query, update, options);
+Userexamresponse.find(query,function(err,userexamresponses){
+  // console.log(req.body.Course_ID,req.body.Exam_ID,err,examDetails);
+    if(err){console.log(err)}
+    else if(!userexamresponses){
+        res.json({message : "Exam Not Attempted"})
+      }
+    else if(userexamresponses){
+      res.json({message : "Exam Results Found",userexamresponses});
+    }
+
+})
+}
+
+
+
+//ExamSubmit route ends
 
 
 // app.use(jwt({secret:jwtsecret,getToken: req => req.cookies.token,algorithms: ['HS256']}));
