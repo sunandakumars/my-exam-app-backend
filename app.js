@@ -6,13 +6,24 @@ const app = express();
 const jwt = require('express-jwt');
 const cookieParser = require('cookie-parser');
 const jsonwebtoken = require('jsonwebtoken');
+const multer = require('multer');
+
+const crypto = require('crypto');
+
+const base64JS = require('js-base64') ;
+ const hmacSha256 = require('crypto-js/hmac-sha256') ;
+ const encBase64 = require('crypto-js/enc-base64');
+
 
 app.use(bodyParser.urlencoded({extended:true}));
 app.use(cookieParser());
+// app.use('/uploads', express.static(path.join(__dirname, 'public')));
+app.use("/public/uploads",express.static("public/uploads"));
 
 const jwtsecret = "secret123";
 var https = require('https');
-mongoose.connect("mongodb://localhost:27017/userDetails",{useNewUrlParser : true,useUnifiedTopology: true})
+// mongoose.connect("mongodb://localhost:27017/userDetails",{useNewUrlParser : true,useUnifiedTopology: true})
+ mongoose.connect("mongodb+srv://admin-kumar:mongo@cluster0.eghgw.mongodb.net/userDetails?retryWrites=true&w=majority",{useNewUrlParser : true,useUnifiedTopology: true})
 console.log(mongoose.connection.readyState);
 // Scehma creation begins
 const userSchema = new mongoose.Schema({
@@ -24,6 +35,8 @@ const userSchema = new mongoose.Schema({
 const examSchema = new mongoose.Schema({
   Course_ID : String,
   Course_Name : String,
+  Month_Name: String,
+  Year: String,
   Exam_ID : String,
   Exam_Name : String,
   date:Date,
@@ -47,10 +60,24 @@ const userexamresponseSchema = new mongoose.Schema({
   userResults:Object
 });
 
+const imageSchema = new mongoose.Schema({
+  imageName : {
+    type : String,
+    default:"none",
+    required:true
+  },
+  imageData:{
+    type:String,
+    required:true
+  }
+
+});
+
 const User = mongoose.model("User",userSchema);
 const Exam = mongoose.model("Exam",examSchema);
 const Coursemonth = mongoose.model("Coursemonth",coursemonthSchema);
 const Userexamresponse = mongoose.model("Userexamresponse",userexamresponseSchema);
+const Image = mongoose.model("Image",imageSchema);
 // Schema creation ends
 
 app.get("/",function(req,res){
@@ -65,26 +92,7 @@ console.log("cookie deleted");
 // res.send({status:err.status,mesage:err.message});
 });
 
-app.post("/home",function(req,res){
-// const reqdata = JSON.parse(req)
-//   const decoded = jsonwebtoken.verify(req.cookies.token,jwtsecret);
-//   const date = new Date(parseInt(decoded.iat)*1000);
-// console.log({req},"deocedvalue:",decoded,"iat",date,"cookie:",req.cookies.token);
-// console.log({req.body});
-// inseting the data ino=to the db
-  const user = new User({
-    Fname : req.body.Fname,
-    Lname : req.body.Lname,
-    Email : req.body.Email,
-    Password : req.body.Password
-  });
-  // saving the result
-  user.save(function(err,result){
-    if (err){console.log(err);}
-    else{console.log(result)}
-})
- res.send("request receievd");
-});
+
 
 // Register route begins
 app.post("/register",register)
@@ -294,6 +302,74 @@ Userexamresponse.find(query,function(err,userexamresponses){
 
 
 //ExamSubmit route ends
+
+//Image upload Route begins
+
+const storage =multer.diskStorage({
+destination: function (req,file,cb){cb(null,"public/uploads")},
+filename: function (req,file,cb){cb(null,Date.now() + "-" +file.originalname)}
+
+})
+
+const upload = multer({storage:storage}).single("file");
+
+app.post("/upload",function(req,res){
+
+upload(req,res,function(err){
+// console.log("reqfile",req.file,req.protocol+'://'+req.get('host')+'/public/'+req.file.filename);
+
+      const imagePath =  req.protocol+'://'+req.get('host')+'/public/uploads/'+req.file.filename;
+      const newImage = new Image({
+      imageName:req.file.filename,
+      imageData:imagePath
+      });
+        newImage.save()
+            .then((result)=>{
+              console.log(result);
+            })
+              .catch((err)=> {console.log(err)})
+
+
+
+
+
+if(err instanceof multer.MulterError){return res.status(500).json(err)}
+else if(err){return res.status(500).json(err)}
+return res.status(200).send(req.file)
+
+
+})
+
+
+});
+//Image upload Route ends
+
+// Zoom Generate Signature Function begins
+app.post("/ZoomGenerateSignature",generateSignature)
+
+function generateSignature(req,res) {
+console.log(req.body,"Zoom");
+const apiKey = req.body.webinarDetails.apiKey;
+const meetingNumber=req.body.webinarDetails.meetingNumber;
+const role=req.body.webinarDetails.role;
+const apiSecret=req.body.webinarDetails.apiSecret;
+  // Prevent time sync issue between client signature generation and zoom
+  const timestamp = new Date().getTime() - 30000
+  const msg = Buffer.from(apiKey + meetingNumber + timestamp + role).toString('base64')
+  const hash = crypto.createHmac('sha256', apiSecret).update(msg).digest('base64')
+  const signature = Buffer.from(`${apiKey}.${meetingNumber}.${timestamp}.${role}.${hash}`).toString('base64')
+
+  res.json({message:"Signature Generation Successfull",signature:signature});
+   console.log(signature);
+}
+
+
+//Zoom Generate Signature function ends
+
+
+
+
+
 
 
 // app.use(jwt({secret:jwtsecret,getToken: req => req.cookies.token,algorithms: ['HS256']}));
